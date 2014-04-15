@@ -1,0 +1,118 @@
+#!/usr/bin/perl
+# v1.0
+# psz pawel<at>szulczewski<dot>org
+
+use DBI;
+use Time::Format;
+use strict;
+use Switch;
+use Term::ANSIColor;
+
+my $dbname = "psz_prv";
+my $table = "prem";
+my $rightnow = time_format('yyyy-mm-dd');
+my $user = "root";
+my $passw = "secret_passw";
+my $dbh = DBI->connect("dbi:mysql:$dbname", $user, $passw) or 
+	die "Error: $DBI::errstr\n";
+
+my $type = $ARGV[0];
+
+sub insert_event{
+	my ($date, $event_string, $pilne);
+	($date, $event_string, $pilne) = @_;
+
+	my $sql_command = "insert into $table (datew, content, pilne) values (\"$date\", \"$event_string\", \"$pilne\")";
+	my $sth = $dbh->prepare($sql_command);
+	$sth->execute or die "SQL insert error: $DBI::errstr\n";
+}
+
+sub show_events{
+	my ($date);
+	($date) = @_;
+
+	my $sql_command = "select id_prem, pilne, datew, content from $table where (datew >= \"$date\") order by datew";
+	my $sth = $dbh->prepare($sql_command);
+	$sth->execute or die "SQL select error: $DBI::errstr\n";
+
+	while (my @row = $sth->fetchrow_array) {
+		if ($row[1] eq 1) {
+			print color 'bold red';
+		} 
+		elsif ($row[2] eq $date) {
+			print color 'bold blue';
+		} 
+		
+		print "@row\n";
+		print color 'reset';
+	}
+}
+
+sub show_now {
+        my ($date);
+	($date) = @_;
+        my $sql_command = "select content from $table where (datew = \"$date\")";
+	my $sth = $dbh->prepare($sql_command);
+	$sth->execute or die "SQL select error: $DBI::errstr\n";
+        
+	while (my @row = $sth->fetchrow_array) {
+	    print "@row\n";
+	}
+}
+
+sub delete_events{
+	my ($id);
+	($id) = @_;
+
+	my $sql_command = "delete from $table where (id_prem = $id)";
+	my $sth = $dbh->prepare($sql_command);
+	$sth->execute or die "SQL delete error: $DBI::errstr\n";
+}
+
+
+sub usage {
+	print "\nusage:\n------\n";
+	print "usage <a> <b> <c>\n";
+	print "<a> - 1 insert_event (date event), 2 - show_event (date), 3 - right_now, 4 - delete_events(id_prem)\n\n";
+}
+
+if ($#ARGV < 0 || $type < 1 || $type > 111) {
+	usage;
+	exit;
+}
+
+switch ($type) {
+
+	case 1 {
+		my $_date = $ARGV[1];
+		my $_event_string = $ARGV[2];
+		my $_pilne = $ARGV[3];
+
+		insert_event ($_date, $_event_string, $_pilne);
+	}
+
+	case 2 {
+		my $_date = $ARGV[1];
+		if (! $_date) {
+			show_events($rightnow);
+		} 
+		else { 
+			show_events($_date); 
+		}
+	}
+
+	case 3 {
+		show_events($rightnow);
+	}
+
+	case 4 {
+		my $_date = $ARGV[1];
+
+		delete_events($_date);
+	}
+	
+	case 111 {
+		show_now($rightnow);
+        }
+}
+
